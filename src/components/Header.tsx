@@ -13,6 +13,9 @@ const Header = () => {
         </div>
         
         <div className="ml-auto flex items-center space-x-4">
+          <Button variant="ghost" size="sm" asChild>
+            <a href="/management">Management</a>
+          </Button>
           <Button variant="ghost" size="sm">
             About
           </Button>

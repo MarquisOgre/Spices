@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import HomePage from "./pages/HomePage";
+import ManagementPage from "./pages/ManagementPage";
 import NotFound from "./pages/NotFound";
 import Header from "./components/Header";
 
@@ -18,6 +19,7 @@ const App = () => (
         <Header />
         <Routes>
           <Route path="/" element={<HomePage />} />
+          <Route path="/management" element={<ManagementPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
