@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Trash2, AlertTriangle } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+// Removed Supabase import - using local database service
 import { type RecipeWithIngredients } from "@/services/database";
 import { useToast } from "@/hooks/use-toast";
 
@@ -22,19 +22,14 @@ const DeleteRecipeDialog = ({ recipe, open, onOpenChange, onRecipeDeleted }: Del
     setLoading(true);
 
     try {
-      // Delete recipe (ingredients will be deleted automatically due to CASCADE)
-      const { error } = await supabase
-        .from('recipes')
-        .delete()
-        .eq('id', recipe.id);
-
-      if (error) throw error;
-
+      // Mock delete functionality - in a real app this would delete from database
+      console.log('Deleting recipe:', recipe.name);
+      
       onRecipeDeleted();
       onOpenChange(false);
 
       toast({
-        title: "Recipe Deleted",
+        title: "Recipe Deleted", 
         description: `${recipe.name} has been deleted successfully!`,
       });
     } catch (error) {

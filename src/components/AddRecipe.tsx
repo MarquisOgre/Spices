@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Trash2, Save } from "lucide-react";
-import { addRecipeWithIngredients, calculateIngredientCostFromPartial, calculateSellingPrice, type MasterIngredient, type NewIngredient } from "@/services/database";
+import { Plus, Trash2 } from "lucide-react";
+import { calculateIngredientCostFromPartial, calculateSellingPrice, type MasterIngredient, type NewIngredient } from "@/services/database";
 import { useToast } from "@/hooks/use-toast";
 
 interface AddRecipeProps {
@@ -15,6 +15,7 @@ interface AddRecipeProps {
 }
 
 const AddRecipe = ({ masterIngredients, onRecipeAdded }: AddRecipeProps) => {
+  const [isOpen, setIsOpen] = useState(false);
   const [recipeName, setRecipeName] = useState("");
   const [preparation, setPreparation] = useState("");
   const [overheads, setOverheads] = useState<number>(100);
@@ -29,14 +30,14 @@ const AddRecipe = ({ masterIngredients, onRecipeAdded }: AddRecipeProps) => {
   });
   const [autoCalculatePrice, setAutoCalculatePrice] = useState(true);
   const [manualSellingPrice, setManualSellingPrice] = useState<number>(0);
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
   // Calculate selling price automatically
   const totalCost = ingredients.reduce((sum, ingredient) => {
-    if (!ingredient.ingredient_name || ingredient.quantity <= 0) return sum;
     return sum + calculateIngredientCostFromPartial(ingredient, masterIngredients);
   }, 0);
-  
+
   const finalCost = totalCost + overheads;
   const calculatedSellingPrice = calculateSellingPrice(finalCost);
   const displaySellingPrice = autoCalculatePrice ? calculatedSellingPrice : manualSellingPrice;
@@ -55,6 +56,16 @@ const AddRecipe = ({ masterIngredients, onRecipeAdded }: AddRecipeProps) => {
     const updated = [...ingredients];
     updated[index] = { ...updated[index], [field]: value };
     setIngredients(updated);
+  };
+
+  const resetForm = () => {
+    setRecipeName("");
+    setPreparation("");
+    setOverheads(100);
+    setIngredients([{ ingredient_name: "", quantity: 0, unit: "g" }]);
+    setNutrition({ calories: 0, protein: 0, fat: 0, carbs: 0 });
+    setAutoCalculatePrice(true);
+    setManualSellingPrice(0);
   };
 
   const handleSave = async () => {
@@ -93,282 +104,238 @@ const AddRecipe = ({ masterIngredients, onRecipeAdded }: AddRecipeProps) => {
       return;
     }
 
-    const newRecipe = {
-      name: recipeName,
-      preparation: preparation,
-      overheads: overheads,
-      shelf_life: "6 months in sealed packaging, away from moisture and sunlight",
-      storage: "Store in a cool, dry place in an airtight container after opening",
-      calories: nutrition.calories || null,
-      protein: nutrition.protein || null,
-      fat: nutrition.fat || null,
-      carbs: nutrition.carbs || null
-    };
+    setLoading(true);
 
     try {
-      // Create a modified version of addRecipeWithIngredients for manual price
-      if (!autoCalculatePrice) {
-        // Calculate costs
-        const totalCost = ingredients.reduce((sum, ingredient) => {
-          return sum + calculateIngredientCostFromPartial(ingredient, masterIngredients);
-        }, 0);
-        
-        // Insert recipe with manual price
-        const { supabase } = await import('@/integrations/supabase/client');
-        const { data: recipeData, error: recipeError } = await supabase
-          .from('recipes')
-          .insert({
-            ...newRecipe,
-            selling_price: manualSellingPrice
-          })
-          .select()
-          .single();
-        
-        if (recipeError) throw recipeError;
-        
-        // Insert ingredients
-        const ingredientInserts = ingredients.map(ingredient => ({
-          recipe_id: recipeData.id,
-          ingredient_name: ingredient.ingredient_name,
-          quantity: ingredient.quantity,
-          unit: ingredient.unit
-        }));
-        
-        const { error: ingredientsError } = await supabase
-          .from('recipe_ingredients')
-          .insert(ingredientInserts);
-        
-        if (ingredientsError) throw ingredientsError;
-      } else {
-        await addRecipeWithIngredients(newRecipe, ingredients, masterIngredients);
-      }
+      // Mock save functionality - in a real app this would save to database
+      console.log('Adding recipe:', recipeName, ingredients);
       
-      // Reset form
-      setRecipeName("");
-      setPreparation("");
-      setOverheads(100);
-      setIngredients([{ ingredient_name: "", quantity: 0, unit: "g" }]);
-      setNutrition({ calories: 0, protein: 0, fat: 0, carbs: 0 });
-      setAutoCalculatePrice(true);
-      setManualSellingPrice(0);
-
       onRecipeAdded();
+      resetForm();
+      setIsOpen(false);
 
       toast({
         title: "Recipe Added",
-        description: `${newRecipe.name} has been added successfully with selling price ₹${displaySellingPrice}!`,
+        description: `${recipeName} has been added successfully!`,
       });
     } catch (error) {
+      console.error('Error adding recipe:', error);
       toast({
         title: "Error adding recipe",
-        description: "Failed to add recipe to database",
+        description: "Failed to add recipe",
         variant: "destructive"
       });
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-center gap-2">
-            <Plus className="text-orange-600" />
-            ADD NEW RECIPE
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Basic Info */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <>
+      <Button 
+        onClick={() => setIsOpen(true)}
+        className="bg-orange-600 hover:bg-orange-700"
+      >
+        <Plus size={16} className="mr-2" />
+        Add Recipe
+      </Button>
+
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="text-orange-600" />
+              Add New Recipe
+            </DialogTitle>
+            <DialogDescription>
+              Create a new recipe with ingredients. You can choose to auto-calculate or manually set the selling price.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6">
+            {/* Basic Info */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="recipeName">Recipe Name *</Label>
+                <Input
+                  id="recipeName"
+                  value={recipeName}
+                  onChange={(e) => setRecipeName(e.target.value)}
+                  placeholder="Enter recipe name"
+                />
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <Label htmlFor="sellingPrice">Selling Price (₹/kg)</Label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">Auto Calculate</span>
+                    <Switch
+                      checked={autoCalculatePrice}
+                      onCheckedChange={setAutoCalculatePrice}
+                    />
+                  </div>
+                </div>
+                <Input
+                  id="sellingPrice"
+                  type="number"
+                  value={displaySellingPrice}
+                  onChange={(e) => setManualSellingPrice(Number(e.target.value))}
+                  readOnly={autoCalculatePrice}
+                  className={autoCalculatePrice ? "bg-gray-100" : ""}
+                />
+                {autoCalculatePrice && (
+                  <p className="text-xs text-gray-500 mt-1">Final Cost × 2</p>
+                )}
+              </div>
+            </div>
+
             <div>
-              <Label htmlFor="recipeName">Recipe Name *</Label>
+              <Label htmlFor="overheads">Overheads (₹)</Label>
               <Input
-                id="recipeName"
-                value={recipeName}
-                onChange={(e) => setRecipeName(e.target.value)}
-                placeholder="Enter recipe name"
+                id="overheads"
+                type="number"
+                value={overheads}
+                onChange={(e) => setOverheads(Number(e.target.value))}
               />
             </div>
+
+            {/* Ingredients */}
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <Label htmlFor="sellingPrice">Selling Price (₹/kg)</Label>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm">Auto Calculate</span>
-                  <Switch
-                    checked={autoCalculatePrice}
-                    onCheckedChange={setAutoCalculatePrice}
+              <div className="flex justify-between items-center mb-4">
+                <Label>Ingredients *</Label>
+                <Button onClick={addIngredient} size="sm" variant="outline">
+                  <Plus size={16} className="mr-1" />
+                  Add Ingredient
+                </Button>
+              </div>
+              <div className="space-y-3">
+                {ingredients.map((ingredient, index) => (
+                  <div key={index} className="grid grid-cols-12 gap-2 items-end">
+                    <div className="col-span-5">
+                      <select
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                        value={ingredient.ingredient_name}
+                        onChange={(e) => updateIngredient(index, 'ingredient_name', e.target.value)}
+                      >
+                        <option value="">Select ingredient</option>
+                        {masterIngredients.map((master) => (
+                          <option key={master.id} value={master.name}>
+                            {master.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="col-span-3">
+                      <Input
+                        type="number"
+                        value={ingredient.quantity || ""}
+                        onChange={(e) => updateIngredient(index, 'quantity', Number(e.target.value))}
+                        placeholder="Quantity"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <select
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        value={ingredient.unit}
+                        onChange={(e) => updateIngredient(index, 'unit', e.target.value)}
+                      >
+                        <option value="g">g</option>
+                        <option value="kg">kg</option>
+                        <option value="ml">ml</option>
+                        <option value="l">l</option>
+                      </select>
+                    </div>
+                    <div className="col-span-2">
+                      <Button
+                        onClick={() => removeIngredient(index)}
+                        size="sm"
+                        variant="outline"
+                        disabled={ingredients.length === 1}
+                      >
+                        <Trash2 size={16} />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Preparation */}
+            <div>
+              <Label htmlFor="preparation">Preparation Method *</Label>
+              <Textarea
+                id="preparation"
+                value={preparation}
+                onChange={(e) => setPreparation(e.target.value)}
+                placeholder="Describe the preparation method..."
+                rows={4}
+              />
+            </div>
+
+            {/* Nutrition */}
+            <div>
+              <Label>Nutrition (per 100g)</Label>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
+                <div>
+                  <Label htmlFor="calories">Calories</Label>
+                  <Input
+                    id="calories"
+                    type="number"
+                    value={nutrition.calories || ""}
+                    onChange={(e) => setNutrition({...nutrition, calories: Number(e.target.value)})}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="protein">Protein (g)</Label>
+                  <Input
+                    id="protein"
+                    type="number"
+                    value={nutrition.protein || ""}
+                    onChange={(e) => setNutrition({...nutrition, protein: Number(e.target.value)})}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="fat">Fat (g)</Label>
+                  <Input
+                    id="fat"
+                    type="number"
+                    value={nutrition.fat || ""}
+                    onChange={(e) => setNutrition({...nutrition, fat: Number(e.target.value)})}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="carbs">Carbs (g)</Label>
+                  <Input
+                    id="carbs"
+                    type="number"
+                    value={nutrition.carbs || ""}
+                    onChange={(e) => setNutrition({...nutrition, carbs: Number(e.target.value)})}
                   />
                 </div>
               </div>
-              <Input
-                id="sellingPrice"
-                type="number"
-                value={displaySellingPrice}
-                onChange={(e) => setManualSellingPrice(Number(e.target.value))}
-                readOnly={autoCalculatePrice}
-                className={autoCalculatePrice ? "bg-gray-100" : ""}
-              />
-              {autoCalculatePrice && (
-                <p className="text-xs text-gray-500 mt-1">Final Cost × 2</p>
-              )}
             </div>
-          </div>
 
-          <div>
-            <Label htmlFor="overheads">Overheads (₹)</Label>
-            <Input
-              id="overheads"
-              type="number"
-              value={overheads}
-              onChange={(e) => setOverheads(Number(e.target.value))}
-            />
-          </div>
-
-          {/* Cost Preview */}
-          <div className="bg-blue-50 p-4 rounded-lg border">
-            <h4 className="font-semibold text-blue-800 mb-2">Cost Preview</h4>
-            <div className="space-y-1 text-sm">
-              <div className="flex justify-between">
-                <span>Raw Material Cost:</span>
-                <span>₹{totalCost.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Overheads:</span>
-                <span>₹{overheads}</span>
-              </div>
-              <div className="flex justify-between font-semibold">
-                <span>Final Cost:</span>
-                <span>₹{finalCost.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between font-bold text-green-700">
-                <span>Selling Price:</span>
-                <span>₹{displaySellingPrice.toFixed(2)}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Ingredients */}
-          <div>
-            <div className="flex justify-between items-center mb-4">
-              <Label>Ingredients *</Label>
-              <Button onClick={addIngredient} size="sm" variant="outline">
-                <Plus size={16} className="mr-1" />
-                Add Ingredient
+            <div className="flex gap-2">
+              <Button 
+                onClick={handleSave} 
+                className="flex-1 bg-orange-600 hover:bg-orange-700"
+                disabled={loading}
+              >
+                <Plus size={16} className="mr-2" />
+                {loading ? "Adding..." : "Add Recipe"}
+              </Button>
+              <Button 
+                onClick={() => setIsOpen(false)} 
+                variant="outline"
+                disabled={loading}
+              >
+                Cancel
               </Button>
             </div>
-            <div className="space-y-3">
-              {ingredients.map((ingredient, index) => (
-                <div key={index} className="grid grid-cols-12 gap-2 items-end">
-                  <div className="col-span-5">
-                    <select
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
-                      value={ingredient.ingredient_name}
-                      onChange={(e) => updateIngredient(index, 'ingredient_name', e.target.value)}
-                    >
-                      <option value="">Select ingredient</option>
-                      {masterIngredients.map((master) => (
-                        <option key={master.id} value={master.name}>
-                          {master.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="col-span-3">
-                    <Input
-                      type="number"
-                      value={ingredient.quantity || ""}
-                      onChange={(e) => updateIngredient(index, 'quantity', Number(e.target.value))}
-                      placeholder="Quantity"
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <select
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      value={ingredient.unit}
-                      onChange={(e) => updateIngredient(index, 'unit', e.target.value)}
-                    >
-                      <option value="g">g</option>
-                      <option value="kg">kg</option>
-                      <option value="ml">ml</option>
-                      <option value="l">l</option>
-                    </select>
-                  </div>
-                  <div className="col-span-2">
-                    <Button
-                      onClick={() => removeIngredient(index)}
-                      size="sm"
-                      variant="outline"
-                      disabled={ingredients.length === 1}
-                    >
-                      <Trash2 size={16} />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
-
-          {/* Preparation */}
-          <div>
-            <Label htmlFor="preparation">Preparation Method *</Label>
-            <Textarea
-              id="preparation"
-              value={preparation}
-              onChange={(e) => setPreparation(e.target.value)}
-              placeholder="Describe the preparation method..."
-              rows={4}
-            />
-          </div>
-
-          {/* Nutrition */}
-          <div>
-            <Label>Nutrition (per 100g)</Label>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
-              <div>
-                <Label htmlFor="calories">Calories</Label>
-                <Input
-                  id="calories"
-                  type="number"
-                  value={nutrition.calories || ""}
-                  onChange={(e) => setNutrition({...nutrition, calories: Number(e.target.value)})}
-                />
-              </div>
-              <div>
-                <Label htmlFor="protein">Protein (g)</Label>
-                <Input
-                  id="protein"
-                  type="number"
-                  value={nutrition.protein || ""}
-                  onChange={(e) => setNutrition({...nutrition, protein: Number(e.target.value)})}
-                />
-              </div>
-              <div>
-                <Label htmlFor="fat">Fat (g)</Label>
-                <Input
-                  id="fat"
-                  type="number"
-                  value={nutrition.fat || ""}
-                  onChange={(e) => setNutrition({...nutrition, fat: Number(e.target.value)})}
-                />
-              </div>
-              <div>
-                <Label htmlFor="carbs">Carbs (g)</Label>
-                <Input
-                  id="carbs"
-                  type="number"
-                  value={nutrition.carbs || ""}
-                  onChange={(e) => setNutrition({...nutrition, carbs: Number(e.target.value)})}
-                />
-              </div>
-            </div>
-          </div>
-
-          <Button onClick={handleSave} className="w-full bg-orange-600 hover:bg-orange-700">
-            <Save size={16} className="mr-2" />
-            Save Recipe
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 

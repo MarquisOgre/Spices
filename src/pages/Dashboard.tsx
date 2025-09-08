@@ -9,7 +9,6 @@ import ManageRecipes from '@/components/ManageRecipes';
 import AddRecipe from '@/components/AddRecipe';
 import MasterIngredientList from '@/components/MasterIngredientList';
 import Indent from '@/components/Indent';
-import PricingManager from '@/components/PricingManager';
 import StockRegister from '@/components/StockRegister';
 import Recipes from '@/components/Recipes';
 import * as XLSX from 'xlsx';
@@ -190,7 +189,7 @@ const BackendDashboard: React.FC = () => {
       case 'add-recipe':
         return <AddRecipe masterIngredients={masterIngredients} onRecipeAdded={refreshData} />;
       case 'pricing':
-        return <PricingManager />;
+        return <div className="text-center py-8">Pricing Manager removed</div>;
       case 'indent':
         return <Indent recipes={recipes} masterIngredients={masterIngredients} />;
       case 'stock-register':
